@@ -1,19 +1,20 @@
 import streamlit as st
 import pandas as pd
 
-# ตั้งค่าหน้าเว็บ
+# 1. ตั้งค่าหน้าเว็บให้ดูทันสมัย
 st.set_page_config(page_title="คลังข้อสอบฟิสิกส์ ครูต้อม", layout="wide")
+st.title("🚀 คลังข้อสอบฟิสิกส์ (ระบบอัตโนมัติ)")
 
-st.title("🚀 คลังข้อสอบฟิสิกส์ (ฉบับสมบูรณ์)")
-
-@st.cache_data
+# 2. ฟังก์ชันโหลดข้อมูลและทำความสะอาด (Clean Data)
+@st.cache_data(ttl=60) # ตั้งค่าให้รีเฟรชข้อมูลทุก 1 นาที
 def load_data():
-    # ดึงไฟล์โดยตรงจาก GitHub
     url = "https://raw.githubusercontent.com/toomtarm123456789-byte/physics-exams/main/physics_data.csv"
     try:
         df = pd.read_csv(url)
-        # ล้างช่องว่างที่หัวคอลัมน์
+        # ล้างช่องว่างหัวตาราง
         df.columns = df.columns.str.strip()
+        # แปลงเลข 0 หรือช่องว่างใน image_url ให้เป็นค่าว่างจริงๆ
+        df['image_url'] = df['image_url'].astype(str).replace(['0', '0.0', 'nan', 'None'], '')
         return df
     except Exception as e:
         st.error(f"โหลดข้อมูลไม่ได้: {e}")
@@ -22,15 +23,13 @@ def load_data():
 df = load_data()
 
 if df is not None:
-    # ส่วนกรองข้อมูล (Topic)
-    topic_col = 'topic' if 'topic' in df.columns else df.columns[0]
-    df[topic_col] = df[topic_col].fillna("ทั่วไป").astype(str)
-    topics = ["ทั้งหมด"] + sorted(df[topic_col].unique().tolist())
-    selected = st.sidebar.selectbox("เลือกบทเรียน", topics)
+    # ส่วน Sidebar สำหรับกรองบทเรียน
+    topic_list = ["ทั้งหมด"] + sorted(df['topic'].dropna().unique().tolist())
+    selected_topic = st.sidebar.selectbox("เลือกบทเรียน", topic_list)
+    
+    filtered_df = df if selected_topic == "ทั้งหมด" else df[df['topic'] == selected_topic]
 
-    filtered_df = df if selected == "ทั้งหมด" else df[df[topic_col] == selected]
-
-    # วนลูปแสดงข้อสอบ
+    # 3. ส่วนแสดงผลข้อสอบ
     for _, row in filtered_df.iterrows():
         with st.container():
             col1, col2 = st.columns([2, 1])
@@ -40,12 +39,11 @@ if df is not None:
                 st.write(f"**ตัวเลือก:** {row.get('choices', '-')}")
             
             with col2:
-                # บังคับดึงจากคอลัมน์ image_url เท่านั้น
-                link = str(row.get('image_url', ''))
+                img_link = str(row.get('image_url', '')).strip()
                 
-                # เช็คว่ามีลิงก์และต้องมีรหัส ID ต่อท้าย (ความยาว > 40 ตัวอักษร)
-                if "http" in link and len(link) > 40:
-                    st.image(link.strip(), use_container_width=True)
+                # เงื่อนไขสำคัญ: ต้องมีลิงก์ และมีรหัสไฟล์ต่อท้าย (ยาวกว่า 60 ตัวอักษร)
+                if "http" in img_link and len(img_link) > 60:
+                    st.image(img_link, use_container_width=True)
                 else:
-                    st.warning("⚪ ข้อนี้ไม่มีรูปประกอบ")
+                    st.warning("⚪ ไม่มีรูปประกอบ")
             st.divider()
