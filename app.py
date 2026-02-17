@@ -32,13 +32,13 @@ try:
                 st.subheader(f"📌 รหัส: {row['id']} ({row['exam']})")
                 st.info(f"**โจทย์:** {row['text']}")
                 st.write(f"**ตัวเลือก:** {row['choices']}")
-            with col2:
-                image_link = str(row['image_url'])
-                if "http" in image_link:
-                    st.image(image_link, use_container_width=True)
-                else:
-                    st.warning("❌ ไม่มีรูปประกอบ")
-            st.divider()
+           with col2:
+                    image_link = row.get('image_url')
+                    # ตรวจสอบว่าเป็นข้อความและมีลิงก์ http หรือไม่
+                    if isinstance(image_link, str) and "http" in image_link and len(image_link) > 50:
+                        st.image(image_link, use_container_width=True)
+                    else:
+                        st.warning("❌ ไม่มีรูปประกอบ")
 
 except Exception as e:
     st.error(f"กรุณาอัปโหลดไฟล์ physics_data.csv ขึ้น GitHub ก่อนครับ")
