@@ -1,17 +1,22 @@
 import streamlit as st
 import pandas as pd
 
-# 1. ตั้งค่าหน้าเพจ
 st.set_page_config(page_title="คลังข้อสอบฟิสิกส์ ครูเที่ยง", layout="wide")
+
+# เพิ่ม CSS เพื่อปรับขนาดฟอนต์ให้ใหญ่และอ่านง่ายขึ้น
+st.markdown("""
+    <style>
+    .reportview-container .main .block-container { font-size: 1.2rem; }
+    div[data-testid="stExpander"] p { font-size: 1.1rem; font-weight: bold; }
+    </style>
+    """, unsafe_allow_index=True)
 
 st.title("🚀 คลังข้อสอบฟิสิกส์ ครูเที่ยง")
 
-# 2. ฟังก์ชันโหลดข้อมูล
-@st.cache_data(ttl=1) # ตั้งเป็น 1 วินาทีเพื่อให้เห็นผลการอัปเดตทันที
+@st.cache_data(ttl=1)
 def load_data():
     url = "https://raw.githubusercontent.com/toomtarm123456789-byte/physics-exams/main/physics_data.csv"
     try:
-        # อ่านไฟล์ CSV โดยระบุชื่อคอลัมน์ให้ตรงตามหัวตาราง
         df = pd.read_csv(url)
         return df
     except Exception as e:
@@ -21,50 +26,39 @@ def load_data():
 df = load_data()
 
 if df is not None:
-    # --- Sidebar สำหรับค้นหา ---
     st.sidebar.header("🔍 ค้นหาข้อสอบ")
-    
-    # ใช้คอลัมน์ที่ 2 (Index 1) เป็น TopicCode สำหรับเลือกบทเรียน
     topics = ["ทั้งหมด"] + sorted(df.iloc[:, 1].dropna().unique().tolist())
     selected_topic = st.sidebar.selectbox("เลือกบทเรียน:", topics)
 
-    # กรองข้อมูล
-    if selected_topic == "ทั้งหมด":
-        filtered_df = df
-    else:
-        filtered_df = df[df.iloc[:, 1] == selected_topic]
+    filtered_df = df if selected_topic == "ทั้งหมด" else df[df.iloc[:, 1] == selected_topic]
 
     st.write(f"📊 พบข้อสอบทั้งหมด {len(filtered_df)} ข้อ")
     st.divider()
 
-    # 3. วนลูปแสดงผลข้อสอบ
     for _, row in filtered_df.iterrows():
         with st.container():
-            col1, col2 = st.columns([1.5, 1])
+            col1, col2 = st.columns([1.6, 1])
             
             with col1:
-                # คอลัมน์ A (Index 0): รหัสข้อสอบ
                 st.subheader(f"📌 รหัส: {row.iloc[0]}")
-                
-                # รายละเอียดคอลัมน์ B (Index 1)
                 st.caption(f"บทเรียน: {row.iloc[1]}")
                 
-                # คอลัมน์ C (Index 2): โจทย์
+                # --- ส่วนการแสดงผล LaTeX ---
+                # ใช้ st.markdown เพราะรองรับทั้งข้อความปกติและ LaTeX ที่อยู่ในเครื่องหมาย $...$
                 st.markdown("**โจทย์:**")
-                st.write(row.iloc[2])
+                st.markdown(row.iloc[2]) # คอลัมน์ C: โจทย์
                 
-                # คอลัมน์ D (Index 3): ตัวเลือก
-                st.markdown(f"**ตัวเลือก:** {row.iloc[3]}")
+                st.write("") # เว้นวรรคเล็กน้อย
                 
-                # คอลัมน์ E (Index 4): เฉลย
-                with st.expander("เฉลย"):
+                st.markdown("**ตัวเลือก:**")
+                st.markdown(row.iloc[3]) # คอลัมน์ D: ตัวเลือก
+                
+                with st.expander("ดูเฉลย"):
+                    # แสดงเฉลยแบบสวยๆ
                     st.success(f"คำตอบคือ: {row.iloc[4]}")
             
             with col2:
-                # คอลัมน์ I (Index 8): image_id
-                # หมายเหตุ: .iloc[8] คือคอลัมน์ I ในตาราง
                 img_id = str(row.iloc[8]).strip()
-                
                 if img_id and img_id not in ["nan", "ไม่พบรูปภาพ", "ไม่มีรูป"]:
                     img_url = f"https://drive.google.com/thumbnail?authuser=0&sz=w1000&id={img_id}"
                     st.image(img_url, use_container_width=True)
