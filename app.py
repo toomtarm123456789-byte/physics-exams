@@ -1,17 +1,25 @@
 import streamlit as st
 import pandas as pd
-import re
 
-# 1. ตั้งค่าหน้าเว็บ
+# 1. ตั้งค่าหน้าเพจ
 st.set_page_config(page_title="คลังข้อสอบฟิสิกส์ ครูเที่ยง", layout="wide")
+
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stAlert { border-radius: 10px; }
+    </style>
+    """, unsafe_allow_index=True)
+
 st.title("🚀 คลังข้อสอบฟิสิกส์ ครูเที่ยง")
 
 # 2. ฟังก์ชันโหลดข้อมูล
-@st.cache_data(ttl=1)
+@st.cache_data(ttl=60)
 def load_data():
+    # เปลี่ยน URL เป็นลิงก์ Raw ของไฟล์ CSV ใน GitHub ของคุณ
     url = "https://raw.githubusercontent.com/toomtarm123456789-byte/physics-exams/main/physics_data.csv"
     try:
-        # อ่านไฟล์โดยไม่ใช้ชื่อหัวตาราง (header=0 เพื่อข้ามแถวแรกที่เป็นชื่อคอลัมน์ไป)
+        # กำหนด header=0 เพื่อใช้แถวแรกเป็นหัวตาราง
         df = pd.read_csv(url)
         return df
     except Exception as e:
@@ -21,51 +29,55 @@ def load_data():
 df = load_data()
 
 if df is not None:
-    # --- ส่วนการค้นหาด้านข้าง (ใช้คอลัมน์ B หรือ Index 1 สำหรับ Topic) ---
+    # --- Sidebar สำหรับค้นหา ---
     st.sidebar.header("🔍 ค้นหาข้อสอบ")
-    # คอลัมน์ B คือ Topic (Index 1)
-    topic_list = ["ทั้งหมด"] + sorted(df.iloc[:, 1].dropna().unique().tolist())
-    selected_topic = st.sidebar.selectbox("เลือกบทเรียน:", topic_list)
     
-    # กรองข้อมูลตามคอลัมน์ B
-    filtered_df = df if selected_topic == "ทั้งหมด" else df[df.iloc[:, 1] == selected_topic]
+    # ดึงรายชื่อบทเรียนจากคอลัมน์ TopicCode (Index 1)
+    topics = ["ทั้งหมด"] + sorted(df.iloc[:, 1].dropna().unique().tolist())
+    selected_topic = st.sidebar.selectbox("เลือกบทเรียน (TopicCode):", topics)
+
+    # กรองข้อมูล
+    if selected_topic == "ทั้งหมด":
+        filtered_df = df
+    else:
+        filtered_df = df[df.iloc[:, 1] == selected_topic]
 
     st.write(f"📊 พบข้อสอบทั้งหมด {len(filtered_df)} ข้อ")
     st.divider()
 
-    # 3. ส่วนแสดงผลข้อสอบ (ระบุคอลัมน์ A=0, B=1, C=2, D=3, E=4, F=5, I=8)
-    for _, row in filtered_df.iterrows():
+    # 3. วนลูปแสดงผลข้อสอบ
+    for index, row in filtered_df.iterrows():
         with st.container():
             col1, col2 = st.columns([1.5, 1])
             
             with col1:
-                # คอลัมน์ A (Index 0) = id
-                st.subheader(f"📌 รหัส: {row.iloc[0]}") 
+                # คอลัมน์ A (Index 0): รหัสข้อสอบ
+                st.subheader(f"📌 รหัส: {row.iloc[0]}")
                 
-                # คอลัมน์ B (Index 1) = topic, C (Index 2) = year, D (Index 3) = exam
-                st.caption(f"บทเรียน: {row.iloc[1]} | ปี: {row.iloc[2]} | แหล่งที่มา: {row.iloc[3]}")
+                # คอลัมน์ B (Index 1): บทเรียน
+                st.caption(f"บทเรียน: {row.iloc[1]}")
                 
-                # คอลัมน์ E (Index 4) = text (โจทย์)
-                st.markdown(f"**โจทย์:**\n{row.iloc[4]}")
+                # คอลัมน์ C (Index 2): โจทย์ (ใช้ Markdown เพื่อรองรับ LaTeX)
+                st.markdown("**โจทย์:**")
+                st.markdown(row.iloc[2])
                 
-                # คอลัมน์ F (Index 5) = choices (ตัวเลือก)
-                st.write(f"**ตัวเลือก:** {row.iloc[5]}")
+                # คอลัมน์ D (Index 3): ตัวเลือก
+                st.info(f"**ตัวเลือก:** {row.iloc[3]}")
+                
+                # คอลัมน์ E (Index 4): เฉลย (ซ่อนไว้ให้กดดู)
+                with st.expander("คลิกเพื่อดูเฉลย"):
+                    st.success(f"คำตอบคือ: {row.iloc[4]}")
             
             with col2:
-                # --- คอลัมน์ I (Index 8) = รูปภาพ ---
-                try:
-                    raw_link = str(row.iloc[8]) 
-                    # ค้นหารหัส ID จากลิงก์ Google Drive
-                    match = re.search(r'id=([a-zA-Z0-9_-]{25,})', raw_link)
-                    
-                    if match:
-                        file_id = match.group(1)
-                        # ใช้ลิงก์แสดงผลแบบ thumbnail เพื่อความเสถียร
-                        direct_link = f"https://drive.google.com/thumbnail?authuser=0&sz=w1000&id={file_id}"
-                        st.image(direct_link, use_container_width=True)
-                    else:
-                        st.info("⚪ ไม่มีรูปประกอบ")
-                except:
-                    st.warning("⚠️ ไม่พบข้อมูลรูปในคอลัมน์ I")
+                # คอลัมน์ I (Index 8): image_id
+                img_id = str(row.iloc[8]).strip()
+                
+                # ตรวจสอบว่ามี ID รูปภาพที่ใช้งานได้จริงหรือไม่
+                if img_id and img_id not in ["nan", "ไม่พบรูปภาพ", "ไม่มีรูป"]:
+                    # ใช้ URL Thumbnail ของ Google Drive (ให้ภาพชัดและโหลดไว)
+                    img_url = f"https://drive.google.com/thumbnail?authuser=0&sz=w1000&id={img_id}"
+                    st.image(img_url, use_container_width=True, caption=f"รูปประกอบ {row.iloc[0]}")
+                else:
+                    st.text("— ไม่มีรูปภาพประกอบ —")
             
             st.divider()
